@@ -1,0 +1,58 @@
+name: combined_eval
+version: "1.0"
+description: >-
+  Evaluation suite for a CAD design-assistant workflow covering factual
+  knowledge retrieval, structured tool-call generation, and design parameter
+  specification.
+
+prompts:
+  - id: bolt_spec_001
+    prompt: "What are the standard thread pitch and nominal diameter for an M8 bolt?"
+    expected_facts:
+      - "8mm"
+      - "1.25mm"
+      - "pitch"
+    category: factual
+
+  - id: part_lookup_001
+    prompt: "Look up the part specifications for SKU-4521 and return the result as JSON."
+    expected_tool_calls:
+      - schema:
+          type: object
+          properties:
+            sku:
+              type: string
+          required:
+            - sku
+    category: tool_use
+
+  - id: material_spec_001
+    prompt: "What is the ultimate tensile strength of 6061-T6 aluminum alloy?"
+    expected_facts:
+      - "276 MPa"
+      - "6061"
+      - "aluminum"
+    category: factual
+
+  - id: tolerance_001
+    prompt: "What tolerance fit class is H7/h6, and what is it typically used for?"
+    expected_facts:
+      - "H7"
+      - "clearance"
+      - "shaft"
+    category: factual
+
+  - id: design_param_001
+    prompt: "Generate a component specification JSON for a steel bracket with 5mm wall thickness."
+    expected_tool_calls:
+      - schema:
+          type: object
+          properties:
+            material:
+              type: string
+            component_type:
+              type: string
+          required:
+            - material
+            - component_type
+    category: tool_use

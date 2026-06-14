@@ -1,0 +1,8 @@
+{
+  "factual_accuracy": 0.75,
+  "json_validity": 0.90,
+  "avg_latency_ms": 150.0,
+  "total_input_tokens": 80,
+  "total_output_tokens": 150,
+  "estimated_cost_usd": 0.001
+}
