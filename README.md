@@ -4,7 +4,7 @@ A cloud-ready LLM evaluation harness for CAD design-assistant workflows.
 
 Runs YAML-defined prompt sets against model APIs and scores responses for factual accuracy, JSON tool-call schema validity, latency, token cost, and cross-run consistency. Baseline regression detection flags drops across model or prompt changes, and a markdown report is produced for every run.
 
-The project is AWS-compatible rather than AWS-dependent. By default, it runs locally and uses LocalStack to emulate S3 and DynamoDB. The same boto3-based storage clients can target real AWS by removing the LocalStack endpoint and providing normal AWS credentials or an IAM role.
+The project is AWS-compatible rather than AWS-dependent (poor uni student). By default, it runs locally and uses LocalStack to emulate S3 and DynamoDB. The same boto3-based storage clients can target real AWS by removing the LocalStack endpoint and providing normal AWS credentials or an IAM role.
 
 This mirrors how a real evaluation service would be built: the eval runner is containerized, artifacts are stored in object storage, run metadata is persisted in a database, and the execution path is reproducible locally or in cloud infrastructure.
 
