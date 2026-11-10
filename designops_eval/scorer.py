@@ -7,11 +7,19 @@ COST_PER_1K_INPUT = {
     "mock": 0.0,
     "claude-sonnet-4-6": 0.003,
     "claude-haiku-4-5-20251001": 0.00025,
+    # Cohere — verify current pricing at https://cohere.com/pricing before citing exact numbers.
+    # These are approximate as of mid-2025 (~$2.50 / 1M input tokens).
+    "cohere-command-a": 0.0025,
+    "cohere-command-r-plus": 0.0025,
 }
 COST_PER_1K_OUTPUT = {
     "mock": 0.0,
     "claude-sonnet-4-6": 0.015,
     "claude-haiku-4-5-20251001": 0.00125,
+    # Cohere — verify current pricing at https://cohere.com/pricing before citing exact numbers.
+    # These are approximate as of mid-2025 (~$10.00 / 1M output tokens).
+    "cohere-command-a": 0.010,
+    "cohere-command-r-plus": 0.010,
 }
 
 
@@ -63,6 +71,8 @@ def score_json_validity(response_text: str, expected_schema: dict | None) -> flo
 
 
 def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    if model.startswith("fake-"):
+        return 0.0
     in_rate = COST_PER_1K_INPUT.get(model, 0.003)
     out_rate = COST_PER_1K_OUTPUT.get(model, 0.015)
     return (input_tokens / 1000) * in_rate + (output_tokens / 1000) * out_rate

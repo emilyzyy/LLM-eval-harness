@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Keep in step with .python-version and .github/workflows/tests.yml.
+FROM python:3.13-slim
 
 WORKDIR /app
 

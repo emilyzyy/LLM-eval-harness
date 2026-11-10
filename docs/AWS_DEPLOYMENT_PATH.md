@@ -1,6 +1,6 @@
 # AWS Deployment Path
 
-The project is not deployed to AWS by default. It is cloud-ready because the artifact and metadata paths use standard AWS SDK clients. LocalStack is only used as a local endpoint. Moving to real AWS means removing `AWS_ENDPOINT_URL`, providing AWS credentials/IAM permissions, and provisioning the equivalent S3 bucket and DynamoDB table.
+The project is not deployed to AWS by default (brokie). It is cloud-ready because the artifact and metadata paths use standard AWS SDK clients. LocalStack is only used as a local endpoint. Moving to real AWS means providing AWS credentials/IAM permissions in place of `AWS_ENDPOINT_URL`, , and provisioning the equivalent S3 bucket and DynamoDB table.
 
 ---
 
@@ -97,29 +97,90 @@ The caller (user, role, or task role) needs:
 
 ---
 
-## Optional ECS/Fargate migration
+## Distributed workers on ECS Fargate
 
-The application code does not need to change for containerized cloud deployment. Only deployment configuration changes:
+The distributed evaluation path (see `docs/PROJECT_TECHNICAL_OVERVIEW.md`, section 15) adds an SQS queue with a dead-letter queue, two DynamoDB tables and an optional ECS Fargate worker service. All of it is defined in `infra/terraform/distributed.tf` and `infra/terraform/worker.tf`.
 
-1. **Build and push the Docker image to ECR:**
-   ```bash
-   aws ecr create-repository --repository-name designops-eval
-   docker build -t designops-eval .
-   docker tag designops-eval:latest <account>.dkr.ecr.<region>.amazonaws.com/designops-eval:latest
-   docker push <account>.dkr.ecr.<region>.amazonaws.com/designops-eval:latest
-   ```
+Nothing in this section has been applied to a real AWS account. The Terraform passes `terraform validate`; it has not been planned or applied.
 
-2. **Create an ECS task definition** referencing the ECR image, and pass environment variables:
-   - `AWS_DEFAULT_REGION`
-   - `DESIGNOPS_S3_BUCKET` (or pass via CLI flags)
-   - `DESIGNOPS_DYNAMODB_TABLE`
-   - Do **not** set `AWS_ENDPOINT_URL` — leave it unset so boto3 uses real AWS
+### What gets created
 
-3. **Attach an IAM task role** with the S3 and DynamoDB permissions above. The application will pick up credentials automatically via the ECS metadata endpoint.
+| Resource | When | Idle cost |
+|----------|------|-----------|
+| SQS queue and dead-letter queue | Always | None |
+| DynamoDB results table and rate-limit table (on-demand) | Always | None beyond stored data |
+| ECR repository, IAM roles, log group, ECS cluster, task definition, service | `enable_worker_service = true` | ECR image storage; logs retained 7 days |
+| Running Fargate tasks | `worker_count > 0` | Billed per task-second while running |
 
-4. **Stream container logs to CloudWatch** by adding a `logConfiguration` block to the task definition.
+The only resource with a meaningful running cost is a Fargate task. Check current Fargate pricing for your region before starting one, and set `worker_count` back to 0 when a run finishes.
 
-The evaluation CLI command is unchanged — only the infrastructure around it changes.
+### Review before any `terraform apply`
+
+1. **Existing state.** `terraform.tfstate` already tracks the S3 bucket and runs table. Run `terraform plan` first and confirm it shows only additions, with nothing changed or destroyed.
+2. **Plan size.** With `enable_worker_service = false` expect 4 resources to add (two queues, two tables). With it `true` expect 15.
+3. **Account and region.** `aws sts get-caller-identity` shows the account you intend, and `aws_region` in `terraform.tfvars` is the region the existing resources are in.
+4. **Billing alert.** The zero-spend budget from `docs/REAL_AWS_TERRAFORM_RUN.md` is still active.
+5. **Local validation.** `pytest` passes and `python -m benchmarks.run all` reports `"passed": true` for every scenario.
+6. **Default VPC.** The account has a default VPC in the region (`aws ec2 describe-vpcs --filters Name=isDefault,Values=true`). `worker.tf` places tasks in its subnets.
+7. **IAM policies.** Read both policy documents in `worker.tf`. The task role should have no access beyond the shard queue and the two tables.
+8. **Image architecture.** `worker_cpu_architecture` matches the machine that builds the image: `ARM64` for Apple Silicon, `X86_64` otherwise.
+9. **Provider keys.** Leave `cohere_api_key_secret_arn` empty unless you intend real Cohere calls. With it empty, workers can only use the mock and fake providers.
+10. **Worker count.** `worker_count = 0` for the first apply.
+
+### Deploy
+
+```bash
+cd infra/terraform
+
+# 1. Queues and tables only.
+terraform plan  -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+
+# 2. Worker service with zero tasks. Set enable_worker_service = true first.
+terraform plan  -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+
+# 3. Build and push the image.
+REPO=$(terraform output -raw worker_ecr_repository_url)
+aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
+docker build -t "$REPO:latest" ../..
+docker push "$REPO:latest"
+
+# 4. Start workers. Set worker_count = 3, then:
+terraform apply -var-file=terraform.tfvars
+```
+
+### Run
+
+`submit` and `finalize` run from your machine. Prompt-set paths are resolved inside the worker container, so use paths relative to the repository root.
+
+```bash
+export DESIGNOPS_QUEUE_URL=$(terraform output -raw shard_queue_url)
+export DESIGNOPS_RESULTS_TABLE=$(terraform output -raw results_table_name)
+
+designops-eval submit --run-id aws-run-1 \
+  --prompt-set evals/prompt_sets/generated_300.yaml --models fake-a
+
+designops-eval finalize --run-id aws-run-1 \
+  --prompt-set evals/prompt_sets/generated_300.yaml --models fake-a \
+  --storage aws --s3-bucket <bucket> --dynamodb-table <runs table> \
+  --output-dir results/aws_run_1
+```
+
+The fake provider runs inside each worker process on ECS, so its quota is not shared between tasks. Crash and duplicate-delivery experiments are valid there; shared rate-limit experiments need the fake provider's HTTP server and are run locally with `python -m benchmarks.run rate-limit`.
+
+To inject a crash on ECS, stop a task while it is working (`aws ecs stop-task`) and watch the `shard_received` and `shard_completed` events in the log group.
+
+### Tear down
+
+```bash
+# Stop compute first: set worker_count = 0 and apply.
+# Then, to remove everything:
+aws s3 rm s3://<bucket> --recursive
+terraform destroy -var-file=terraform.tfvars
+```
+
+Confirm in the console that no ECS tasks are running and the ECR repository is gone.
 
 ---
 

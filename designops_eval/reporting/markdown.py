@@ -21,8 +21,10 @@ def generate_report(result: RunResult, baseline: dict | None = None) -> str:
         f"| Total Input Tokens | {s.total_input_tokens} |",
         f"| Total Output Tokens | {s.total_output_tokens} |",
         f"| Estimated Cost (USD) | ${s.estimated_cost_usd:.6f} |",
-        "",
     ]
+    if s.failed_cases:
+        lines.append(f"| Failed Cases | {s.failed_cases} |")
+    lines.append("")
 
     if baseline:
         lines += [

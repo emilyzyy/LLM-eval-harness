@@ -10,3 +10,8 @@ build/
 results/
 .env
 .env.*
+.git/
+infra/
+tests/
+benchmarks/
+docs/

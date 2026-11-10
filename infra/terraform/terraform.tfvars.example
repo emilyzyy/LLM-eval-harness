@@ -1,0 +1,43 @@
+# Example tfvars for a real AWS deployment.
+# Copy to terraform.tfvars and fill in your values.
+#
+# WARNING: Running against real AWS creates real resources that incur charges.
+# An S3 bucket and DynamoDB table (PAY_PER_REQUEST) are both low-cost for
+# small workloads, but you are responsible for what you provision and any
+# data stored.
+#
+# Prerequisites:
+#   1. AWS credentials configured (AWS_PROFILE or ~/.aws/credentials)
+#   2. IAM permissions: s3:CreateBucket, s3:PutObject, dynamodb:CreateTable, dynamodb:PutItem
+#   3. Leave aws_endpoint_url blank (or remove it) to target real AWS
+
+project_name        = "designops-eval"
+environment         = "dev"
+aws_region          = "us-east-1"
+s3_bucket_name      = "designops-eval-artifacts-dev"
+dynamodb_table_name = "designops-eval-runs-dev"
+# aws_endpoint_url  = ""   # omit or leave blank for real AWS
+
+# --- Distributed evaluation -------------------------------------------------
+# The SQS queues and the two extra DynamoDB tables are always created. They
+# have no idle cost.
+#
+# shard_visibility_timeout_seconds = 120
+# shard_max_receive_count          = 5
+
+# The ECS/Fargate worker service is opt-in. Enabling it creates an ECR
+# repository, IAM roles, a log group, a cluster and a service with
+# worker_count tasks. Fargate bills per running task, so keep worker_count
+# at 0 except while a run is in progress.
+#
+# enable_worker_service   = true
+# worker_count            = 0
+# worker_cpu              = 256
+# worker_memory           = 512
+# worker_cpu_architecture = "ARM64"   # must match how the image was built
+# worker_image_tag        = "latest"
+# worker_provider_limits  = ""        # e.g. "cohere=20"
+# worker_extra_environment = {
+#   FAKE_PROVIDER_LATENCY_MS = "50"
+# }
+# cohere_api_key_secret_arn = ""      # only for real Cohere runs

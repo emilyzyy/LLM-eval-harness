@@ -12,6 +12,10 @@ class TraceEntry(BaseModel):
     factual_score: float
     json_validity_score: float
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # "failed" marks a case whose provider call failed permanently. Its scores
+    # are 0.0 and error holds the reason.
+    status: str = "completed"
+    error: str | None = None
 
 
 class RunScores(BaseModel):
@@ -22,6 +26,7 @@ class RunScores(BaseModel):
     total_output_tokens: int
     estimated_cost_usd: float
     consistency_delta: float | None = None
+    failed_cases: int = 0
 
 
 class RunResult(BaseModel):
