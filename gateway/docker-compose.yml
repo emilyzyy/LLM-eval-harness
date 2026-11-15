@@ -1,0 +1,50 @@
+# Starts the gateway, a fake upstream and a single-node Redpanda (a
+# Kafka-compatible broker).
+#
+#   docker compose up --build
+#
+# The keys below are placeholders for local use only.
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      # Two listeners: "internal" for the other containers, "external" for
+      # tools on your machine, reached at localhost:19092.
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  fakeupstream:
+    build: .
+    entrypoint: ["fakeupstream"]
+    command: ["-addr=:9090", "-latency=200ms", "-latency-dist=exponential", "-chunk-delay=30ms", "-tokens=24"]
+    environment:
+      FAKE_UPSTREAM_KEY: local-upstream-key
+    ports:
+      - "9090:9090"
+
+  gateway:
+    build: .
+    command: ["-config=/etc/gateway/config.yaml"]
+    environment:
+      GATEWAY_PROXY_KEY: local-proxy-key
+      FAKE_UPSTREAM_KEY: local-upstream-key
+    volumes:
+      - ./config.compose.yaml:/etc/gateway/config.yaml:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - fakeupstream
+      # The gateway does not need Kafka to start or to serve. It is not
+      # listed here on purpose.

@@ -1,0 +1,8 @@
+{
+  "gateway_requests_total": 320000.0,
+  "gateway_capture_enqueued_total": 320000.0,
+  "gateway_capture_dropped_total": 0.0,
+  "gateway_kafka_produce_errors_total": 0.0,
+  "gateway_proxy_overhead_seconds_sum": 5.046129023001055,
+  "gateway_proxy_overhead_seconds_count": 320000.0
+}

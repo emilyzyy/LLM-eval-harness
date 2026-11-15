@@ -1,0 +1,11 @@
+listen_addr: "127.0.0.1:18082"
+proxy_key_env: GATEWAY_PROXY_KEY
+upstreams:
+  - name: fake
+    base_url: http://127.0.0.1:19090
+    api_key_env: FAKE_UPSTREAM_KEY
+    models: [fake-model]
+capture:
+  sink: kafka
+  kafka:
+    brokers: ["127.0.0.1:19092"]

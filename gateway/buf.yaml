@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  except:
+    # The schema lives at proto/capture.proto rather than proto/capture/v1/.
+    - PACKAGE_DIRECTORY_MATCH
+breaking:
+  use:
+    - FILE

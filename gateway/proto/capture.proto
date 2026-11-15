@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package capture.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/emilyzyy/LLM-eval-harness/gateway/gen/go/capturepb;capturepb";
+
+// CaptureRecord describes one chat completion request that the gateway sent to
+// an upstream, and the response the client received. One record is published
+// per request, keyed by request_id.
+//
+// Compatibility rules: never reuse or renumber a field. Add new fields with
+// new numbers; consumers must ignore fields they do not know.
+message CaptureRecord {
+  // UUIDv7 assigned at ingress, or the client's X-Request-ID if it sent one.
+  string request_id = 1;
+
+  // When the gateway received the request and when it finished responding.
+  google.protobuf.Timestamp received_at = 2;
+  google.protobuf.Timestamp completed_at = 3;
+
+  // Name of the configured upstream that served the request.
+  string upstream = 4;
+  // The "model" field of the request body.
+  string model = 5;
+  // True if the client asked for a streamed (SSE) response.
+  bool stream = 6;
+
+  // The request body exactly as the client sent it.
+  bytes request_body = 7;
+  // The response body exactly as the client received it. For a streamed
+  // response this is the raw SSE text, every chunk in order.
+  bytes response_body = 8;
+  // True if the body was longer than the gateway's capture limit and was cut.
+  bool request_truncated = 9;
+  bool response_truncated = 10;
+
+  // HTTP status sent to the client. 0 if the client left before any status
+  // was written.
+  int32 status_code = 11;
+  Outcome outcome = 12;
+
+  // Token counts reported by the upstream. Unset if the response had none,
+  // which is normal for streams unless the client set
+  // stream_options.include_usage.
+  TokenUsage usage = 13;
+
+  // Time spent waiting on the upstream: every attempt, the backoff between
+  // attempts, and reading the response body.
+  google.protobuf.Duration upstream_latency = 14;
+  // Time from receiving the request to writing the last response byte.
+  google.protobuf.Duration total_latency = 15;
+
+  // Number of upstream attempts made. More than 1 means the gateway retried.
+  int32 attempts = 16;
+}
+
+message TokenUsage {
+  int64 prompt_tokens = 1;
+  int64 completion_tokens = 2;
+  int64 total_tokens = 3;
+}
+
+enum Outcome {
+  OUTCOME_UNSPECIFIED = 0;
+  // The upstream response was relayed in full, whatever its status code.
+  OUTCOME_COMPLETED = 1;
+  // The client disconnected before the response finished.
+  OUTCOME_CLIENT_CANCELLED = 2;
+  // The upstream could not be reached or its response broke off.
+  OUTCOME_UPSTREAM_ERROR = 3;
+  // The upstream did not answer within the gateway's timeouts.
+  OUTCOME_UPSTREAM_TIMEOUT = 4;
+}

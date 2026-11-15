@@ -1,0 +1,19 @@
+# Configuration used by docker-compose.yml. See config.example.yaml for what
+# each setting means.
+listen_addr: ":8080"
+proxy_key_env: GATEWAY_PROXY_KEY
+upstreams:
+  - name: fake
+    base_url: http://fakeupstream:9090
+    api_key_env: FAKE_UPSTREAM_KEY
+    models: [fake-model]
+    rate_limit:
+      requests_per_second: 50
+      burst: 10
+default_upstream: fake
+capture:
+  sink: kafka
+  kafka:
+    brokers: [redpanda:9092]
+    topic: captures
+    partitions: 3

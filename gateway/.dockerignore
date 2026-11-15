@@ -1,0 +1,4 @@
+bench/results/
+schema_test/
+gen/python/
+*.md

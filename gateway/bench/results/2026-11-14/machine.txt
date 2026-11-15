@@ -1,0 +1,16 @@
+date:            2026-11-14T19:39:49Z
+command:         RATES="1000 2000 4000 8000 12000 16000 24000 32000" DURATION=20s COOLDOWN=5 ./bench/run.sh
+git commit:      d89ab2eb229e71d741228c5c1e32400ae498760d (with uncommitted changes under gateway/)
+os:              Darwin 25.6.0 arm64
+os version:      macOS 26.6.2
+cpu:             Apple M4 Pro
+cpu cores:       12
+memory:          24 GiB
+go:              go1.27.4 darwin/arm64
+vegeta:          Version: 12.13.0
+docker:          29.5.3, 12 CPUs and 8321232896 bytes of memory available to containers
+redpanda:        docker.redpanda.com/redpandadata/redpanda:v24.2.4 (--mode=dev-container --smp=1)
+fake upstream:   fixed latency 20ms, 16 tokens, stream chunk delay 2ms, seed 1
+gateway config:  defaults, except as in raw/config-*.yaml (no rate limit; logs discarded)
+run length:      20s per run, 5s between runs
+open file limit: 10240

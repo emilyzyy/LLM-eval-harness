@@ -27,3 +27,82 @@ jobs:
       # credentials and makes no provider API calls.
       - name: Run tests
         run: pytest
+
+  # The jobs below cover gateway/, a separate Go module. They do not use the
+  # Python environment above.
+
+  gateway-go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: gateway/go.mod
+          cache-dependency-path: gateway/go.sum
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: Vet
+        run: go vet -tags integration ./...
+
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 -tags integration ./...
+
+      # Uses the in-process fake upstream. No provider API calls.
+      - name: Unit and integration tests
+        run: go test -race ./...
+
+      # Starts Redpanda in Docker, which the runner provides.
+      - name: Kafka integration tests
+        run: go test -race -tags integration -run 'Kafka|Broker' ./internal/proxy/
+
+  gateway-proto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+          version: 1.75.0
+
+      - name: Lint
+        run: buf lint
+
+      - name: Check formatting
+        run: buf format --diff --exit-code
+
+      # The generated Go and Python code is checked in. Regenerate it and
+      # fail if it no longer matches the schema.
+      - name: Check generated code is current
+        run: |
+          buf generate
+          git diff --exit-code -- gen
+
+  gateway-schema-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install
+        run: pip install "protobuf>=7.36.2" pytest
+
+      # Decodes a record encoded by the Go gateway with the generated Python
+      # code.
+      - name: Decode a capture record in Python
+        run: pytest gateway/schema_test

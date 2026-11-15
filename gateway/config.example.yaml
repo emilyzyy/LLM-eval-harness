@@ -1,0 +1,68 @@
+# Example gateway configuration. Every value shown is the default unless the
+# comment says otherwise. Keys are never written here: the file names the
+# environment variables that hold them.
+
+listen_addr: ":8080"
+
+# Environment variable holding the key clients must send as
+# "Authorization: Bearer <key>".
+proxy_key_env: GATEWAY_PROXY_KEY
+
+# Largest request body accepted, in bytes.
+max_body_bytes: 4194304
+
+# Largest non-streaming response held in memory before it is sent on, in
+# bytes. A longer response still reaches the client in full, passed through as
+# it arrives; its capture record keeps only the first part and is marked
+# truncated.
+max_response_buffer_bytes: 4194304
+
+# Required: at least one upstream.
+upstreams:
+  - name: fake
+    base_url: http://localhost:9090
+    # Environment variable holding this upstream's API key. Leave out to call
+    # the upstream with no Authorization header.
+    api_key_env: FAKE_UPSTREAM_KEY
+    # Requests for these models go to this upstream.
+    models: [fake-model]
+    # Token bucket: `burst` requests may pass at once, refilled at
+    # `requests_per_second`. Over the limit, clients get 429. Leave out for
+    # no limit (the default).
+    rate_limit:
+      requests_per_second: 50
+      burst: 10
+
+# Upstream for models no upstream lists. Leave out to reject them with 404
+# (the default).
+default_upstream: fake
+
+timeouts:
+  request: 60s          # non-streaming: the whole request, retries included
+  response_header: 30s  # how long the upstream may take to start answering
+  stream_idle: 30s      # streaming: longest gap between two chunks
+
+retry:
+  max_attempts: 2       # 1 turns retries off
+  backoff: 100ms
+
+capture:
+  # kafka, jsonl or none. The default is none; this example uses jsonl.
+  sink: jsonl
+  queue_size: 1024        # records that may wait for the writer; beyond this they are dropped
+  # Longer request or response bodies are cut and marked truncated. A record
+  # holds both, and Kafka rejects messages over 1 MB by default, so raise
+  # this only together with the broker's and topic's message size limits.
+  max_body_bytes: 262144
+  flush_timeout: 5s       # how long shutdown waits for pending records
+  jsonl:
+    path: captures.jsonl
+  kafka:
+    brokers: [localhost:19092]  # no default; required for the kafka sink
+    topic: captures
+    partitions: 3               # used only if the gateway creates the topic
+    replication_factor: 1
+    delivery_timeout: 10s       # give up on a record the broker has not acknowledged
+    max_buffered_records: 10000
+
+shutdown_timeout: 15s
